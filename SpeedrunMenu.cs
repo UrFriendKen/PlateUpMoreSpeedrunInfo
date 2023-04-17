@@ -1,9 +1,11 @@
-﻿using KitchenLib.DevUI;
+﻿using Kitchen.NetworkSupport;
+using KitchenLib.DevUI;
 using KitchenLib.Utils;
 using System;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
+using Unity.Entities.UniversalDelegates;
 using UnityEngine;
 
 namespace KitchenMoreSpeedrunInfo
@@ -17,6 +19,7 @@ namespace KitchenMoreSpeedrunInfo
         protected GUIStyle LeaderboardLabelHeaderStyle { get; private set; }
         protected GUIStyle LeaderboardTop1LeftStyle { get; private set; }
         protected GUIStyle LeaderboardTop1CentreStyle { get; private set; }
+        protected GUIStyle DefaultTextBoxStyle { get; private set; }
 
         protected Texture2D Background { get; private set; }
 
@@ -102,6 +105,11 @@ namespace KitchenMoreSpeedrunInfo
                 LeaderboardTop1CentreStyle.stretchWidth = true;
                 LeaderboardTop1CentreStyle.fontSize = 16;
             }
+
+            if (DefaultTextBoxStyle == null)
+            {
+                DefaultTextBoxStyle = new GUIStyle(GUI.skin.textField);
+            }
             OnSetup();
         }
 
@@ -117,7 +125,6 @@ namespace KitchenMoreSpeedrunInfo
         string searchMonth = "";
         string searchYear = "";
         int yearNow;
-        string searchSeed = "";
 
         bool requestedLeaderboard = false;
 
@@ -127,6 +134,12 @@ namespace KitchenMoreSpeedrunInfo
 
         protected const int MAX_ROWS_PER_PAGE = 300;
         private int currentPage = 0;
+
+        protected Color highlightedPlayerColor => Color.red;
+        private string highlightedPlayerNameTemp = String.Empty;
+        private string highlightedPlayerName = SteamPlatform.Steam.LocalUsername;
+        private bool foundHighlightedPlayer = true;
+        private Color searchPlayerNoResultColor => Color.red;
 
         protected virtual void OnInitialise()
         {
@@ -178,6 +191,44 @@ namespace KitchenMoreSpeedrunInfo
             else
             {
                 GUILayout.Label("Date Search", LabelCentreStyle);
+            }
+            GUILayout.EndVertical();
+
+            float nameSearchWidth = (windowWidth - 60f) * 0.3f;
+            GUILayout.BeginVertical(GUILayout.Width(nameSearchWidth));
+            GUILayout.Label("Find player", LabelCentreStyle);
+
+
+            if (!MatchString(highlightedPlayerName, highlightedPlayerNameTemp, ignoreCase: true))
+            {
+                foundHighlightedPlayer = true;
+            }
+
+            GUIStyle playerSearchStyle = DefaultTextBoxStyle;
+            if (!foundHighlightedPlayer)
+            {
+                playerSearchStyle = CustomizeGUIStyle(playerSearchStyle, searchPlayerNoResultColor);
+            }
+            highlightedPlayerNameTemp = GUILayout.TextField(highlightedPlayerNameTemp, playerSearchStyle, GUILayout.Width(nameSearchWidth));
+            if (GUILayout.Button("Player Search"))
+            {
+                highlightedPlayerName = highlightedPlayerNameTemp;
+                for (int i = 0; i < Main.SpeedrunData.Count; i++)
+                {
+                    if (MatchString(highlightedPlayerName, Main.SpeedrunData[i].PlayerName, ignoreCase: true))
+                    {
+                        foundHighlightedPlayer = true;
+                        int goToPage = i / MAX_ROWS_PER_PAGE;
+                        currentPage = goToPage;
+                        scrollPosition = default;
+                        break;
+                    }
+
+                    if (i == Main.SpeedrunData.Count - 1)
+                    {
+                        foundHighlightedPlayer = false;
+                    }
+                }
             }
             GUILayout.EndVertical();
 
@@ -241,15 +292,56 @@ namespace KitchenMoreSpeedrunInfo
                 GUILayout.BeginHorizontal();
                 GUILayout.Space(15f);
                 bool isLeader = currentPage == 0 && i == 0;
-                GUILayout.Label(speedrunEntry.Rank.ToString(), isLeader ? LeaderboardTop1CentreStyle : LeaderboardLabelCentreStyle, GUILayout.Width(col1Width));
-                GUILayout.Label(speedrunEntry.PlayerName, isLeader ? LeaderboardTop1LeftStyle : LeaderboardLabelLeftStyle, GUILayout.Width(col2Width));
-                GUILayout.Label(speedrunEntry.RunTimeString, isLeader ? LeaderboardTop1CentreStyle : LeaderboardLabelCentreStyle, GUILayout.Width(col3Width));
+                DrawRow(speedrunEntry, (col1Width, col2Width, col3Width), isLeader);
                 GUILayout.Label("", GUILayout.Width(15f));
                 GUILayout.EndHorizontal();
             }
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
+        }
+
+        private static bool MatchString(string str1, string str2, bool ignoreCase = false)
+        {
+            if (ignoreCase)
+            {
+                str1 = str1.ToLower();
+                str2 = str2.ToLower();
+            }
+            return str1.Equals(str2);
+        }
+
+        private void DrawRow(SpeedrunEntry speedrunEntry, (float, float, float) widths, bool isLeader = false)
+        {
+            GUIStyle centreStyle = isLeader ? LeaderboardTop1CentreStyle : LeaderboardLabelCentreStyle;
+            GUIStyle leftStyle = isLeader ? LeaderboardTop1LeftStyle : LeaderboardLabelLeftStyle;
+
+            bool highlightPlayer = MatchString(highlightedPlayerName, speedrunEntry.PlayerName, ignoreCase: true);
+            if (highlightPlayer)
+            {
+                centreStyle = CustomizeGUIStyle(centreStyle, highlightedPlayerColor);
+                leftStyle = CustomizeGUIStyle(leftStyle, highlightedPlayerColor);
+            }
+
+            GUILayout.Label(speedrunEntry.Rank.ToString(), centreStyle, GUILayout.Width(widths.Item1));
+            GUILayout.Label(speedrunEntry.PlayerName, leftStyle, GUILayout.Width(widths.Item2));
+            GUILayout.Label(speedrunEntry.RunTimeString, centreStyle, GUILayout.Width(widths.Item3));
+        }
+
+        private GUIStyle CustomizeGUIStyle(GUIStyle style, Color? newTextColor = null, bool changeOriginal = false)
+        {
+            if (!changeOriginal)
+            {
+                style = new GUIStyle(style);
+            }
+
+            if (newTextColor.HasValue)
+            {
+                style.normal.textColor = newTextColor.Value;
+                style.hover.textColor = newTextColor.Value;
+                style.focused.textColor = newTextColor.Value;
+            }
+            return style;
         }
 
         private string SanitiseIntInput(string input, string fallback = "", int min = int.MinValue, int max = int.MaxValue)

@@ -10,6 +10,8 @@ using Steamworks;
 using System.Globalization;
 using KitchenData;
 using KitchenLib.Utils;
+using Kitchen.NetworkSupport;
+using HarmonyLib;
 
 // Namespace should have "Kitchen" in the beginning
 namespace KitchenMoreSpeedrunInfo
@@ -30,7 +32,7 @@ namespace KitchenMoreSpeedrunInfo
         // Mod Version must follow semver notation e.g. "1.2.3"
         public const string MOD_GUID = "IcedMilo.PlateUp.MoreSpeedrunInfo";
         public const string MOD_NAME = "MoreSpeedrunInfo";
-        public const string MOD_VERSION = "0.2.0";
+        public const string MOD_VERSION = "0.2.1";
         public const string MOD_AUTHOR = "IcedMilo";
         public const string MOD_GAMEVERSION = ">=1.1.5";
         // Game version this mod is designed for in semver
@@ -57,10 +59,6 @@ namespace KitchenMoreSpeedrunInfo
         internal static int LoadedWeek;
         internal static int LoadedYear;
 
-
-
-
-
         public Main() : base(MOD_GUID, MOD_NAME, MOD_AUTHOR, MOD_VERSION, MOD_GAMEVERSION, Assembly.GetExecutingAssembly()) { }
 
         protected override void OnInitialise()
@@ -74,6 +72,7 @@ namespace KitchenMoreSpeedrunInfo
 
         protected override async void OnUpdate()
         {
+            Main.LogInfo(SteamPlatform.Steam.LocalUsername);
             if (refreshLeaderboard)
             {
                 refreshLeaderboard = false;
@@ -94,7 +93,6 @@ namespace KitchenMoreSpeedrunInfo
                         {
                             TimeSpan timeSpan = new TimeSpan(page[j].Score * 10000L);
                             string runTimeString = String.Format("{0}:{1:00}.{2:000}", (int)timeSpan.TotalMinutes, timeSpan.Seconds, timeSpan.Milliseconds);
-                            //Debug.Log($"{page[j].GlobalRank}|{page[j].User.Name}|{runTimeString}");
                             newData.Add(new SpeedrunEntry
                             {
                                 PlayerID = page[j].User.Id,
@@ -110,17 +108,26 @@ namespace KitchenMoreSpeedrunInfo
 
                 LoadedWeek = RequestWeek;
                 LoadedYear = RequestYear;
-                int source = LoadedYear * 200 + LoadedWeek;
-                LayoutSeed layoutSeed = new LayoutSeed(source);
-                SpeedrunSeed = layoutSeed.FixedSeed.Value.ToString().ToUpper();
-                using FixedSeedContext fixedSeedContext = new FixedSeedContext(layoutSeed.FixedSeed, 8853129); int dishID;
-                using (fixedSeedContext.UseSubcontext(1))
-                {
-                    dishID = Kitchen.RandomExtensions.Random(AssetReference.SpeedrunDish);
-                    SpeedrunDish = (GDOUtils.GetExistingGDO(dishID) as Dish).Info.Get().Name;
-                }
+
+                (SpeedrunSeed, SpeedrunDish) = GetSpeedrunDetails(LoadedWeek, LoadedYear);
                 IsLoading = false;
             }
+        }
+
+
+        internal static (string, string) GetSpeedrunDetails(int year, int week)
+        {
+            int source = year * 200 + week;
+            LayoutSeed layoutSeed = new LayoutSeed(source);
+            string seed = layoutSeed.FixedSeed.Value.ToString().ToUpper();
+            using FixedSeedContext fixedSeedContext = new FixedSeedContext(layoutSeed.FixedSeed, 8853129); int dishID;
+            string dish;
+            using (fixedSeedContext.UseSubcontext(1))
+            {
+                dishID = Kitchen.RandomExtensions.Random(AssetReference.SpeedrunDish);
+                dish = (GDOUtils.GetExistingGDO(dishID) as Dish).Info.Get().Name;
+            }
+            return (seed, dish);
         }
 
         internal static void RequestLeaderboard(DateTime dateTime)
@@ -139,6 +146,26 @@ namespace KitchenMoreSpeedrunInfo
             int weekOfYear = gregorianCalendar.GetWeekOfYear(dateTime, CalendarWeekRule.FirstDay, DayOfWeek.Monday);
             int year = gregorianCalendar.GetYear(dateTime);
             return (year, weekOfYear);
+        }
+
+        private static void LogLookAhead(int toYear, int fromYear = 2023)
+        {
+            LogInfo("Speedrun lookahead");
+            for (int i = fromYear; i < toYear + 1; i++)
+            {
+                for (int j = 1; j < GetWeeksInYear(i) + 1; j++)
+                {
+                    (string, string) speedrunDetails = GetSpeedrunDetails(i, j);
+                    LogInfo($"{i},{j},{speedrunDetails.Item2},{speedrunDetails.Item1}");
+                }
+            }
+        }
+
+        internal static int GetWeeksInYear(int year)
+        {
+            GregorianCalendar gregorianCalendar = new GregorianCalendar();
+            DateTime date1 = new DateTime(year, 12, 31);
+            return gregorianCalendar.GetWeekOfYear(date1, CalendarWeekRule.FirstDay, DayOfWeek.Monday);
         }
 
         protected override void OnPostActivate(KitchenMods.Mod mod)
