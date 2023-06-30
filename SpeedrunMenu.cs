@@ -5,7 +5,6 @@ using System;
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
-using Unity.Entities.UniversalDelegates;
 using UnityEngine;
 
 namespace KitchenMoreSpeedrunInfo
@@ -247,7 +246,7 @@ namespace KitchenMoreSpeedrunInfo
 
             GUILayout.Label("");
             GUILayout.Label($"Leaderboard (Week {Main.LoadedWeek}, Year {Main.LoadedYear})", LeaderboardLabelHeaderStyle);
-            GUILayout.Label($"{Main.SpeedrunDish} - {Main.SpeedrunSeed}", LeaderboardLabelHeaderStyle);
+            GUILayout.Label($"{Main.SpeedrunSeed} ({Main.SpeedrunSetting}) - {Main.SpeedrunDish}", LeaderboardLabelHeaderStyle);
             GUILayout.Label($"{Main.SpeedrunData.Count} Participants", LeaderboardTop1CentreStyle);
             GUILayout.Label("");
 
@@ -395,6 +394,7 @@ namespace KitchenMoreSpeedrunInfo
             sb.AppendLine($"Year,{Main.LoadedYear}");
             sb.AppendLine($"Week,{Main.LoadedWeek}");
             sb.AppendLine($"Seed,{Main.SpeedrunSeed}");
+            sb.AppendLine($"Setting,{Main.SpeedrunSetting}");
             sb.AppendLine($"Year,{Main.SpeedrunDish}");
             sb.AppendLine("Rank,Username,Time");
             for (int i = 0; i < Main.SpeedrunData.Count; i++)

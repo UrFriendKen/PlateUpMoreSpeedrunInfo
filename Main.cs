@@ -1,17 +1,17 @@
-﻿using KitchenLib;
+﻿using Kitchen;
+using KitchenData;
+using KitchenLib;
+using KitchenLib.References;
+using KitchenLib.Utils;
 using KitchenMods;
-using System.Reflection;
-using UnityEngine;
-using Kitchen;
+using Steamworks;
 using Steamworks.Data;
 using System;
 using System.Collections.Generic;
-using Steamworks;
 using System.Globalization;
-using KitchenData;
-using KitchenLib.Utils;
-using Kitchen.NetworkSupport;
-using HarmonyLib;
+using System.Linq;
+using System.Reflection;
+using UnityEngine;
 
 // Namespace should have "Kitchen" in the beginning
 namespace KitchenMoreSpeedrunInfo
@@ -32,7 +32,7 @@ namespace KitchenMoreSpeedrunInfo
         // Mod Version must follow semver notation e.g. "1.2.3"
         public const string MOD_GUID = "IcedMilo.PlateUp.MoreSpeedrunInfo";
         public const string MOD_NAME = "MoreSpeedrunInfo";
-        public const string MOD_VERSION = "0.2.1";
+        public const string MOD_VERSION = "0.2.4";
         public const string MOD_AUTHOR = "IcedMilo";
         public const string MOD_GAMEVERSION = ">=1.1.5";
         // Game version this mod is designed for in semver
@@ -55,6 +55,7 @@ namespace KitchenMoreSpeedrunInfo
         internal static bool IsLoading { get; private set; } = true;
         internal static List<SpeedrunEntry> SpeedrunData = new List<SpeedrunEntry>();
         internal static string SpeedrunDish = "";
+        internal static string SpeedrunSetting = "";
         internal static string SpeedrunSeed = "";
         internal static int LoadedWeek;
         internal static int LoadedYear;
@@ -72,7 +73,6 @@ namespace KitchenMoreSpeedrunInfo
 
         protected override async void OnUpdate()
         {
-            Main.LogInfo(SteamPlatform.Steam.LocalUsername);
             if (refreshLeaderboard)
             {
                 refreshLeaderboard = false;
@@ -109,25 +109,48 @@ namespace KitchenMoreSpeedrunInfo
                 LoadedWeek = RequestWeek;
                 LoadedYear = RequestYear;
 
-                (SpeedrunSeed, SpeedrunDish) = GetSpeedrunDetails(LoadedWeek, LoadedYear);
+                (SpeedrunSeed, SpeedrunSetting, SpeedrunDish) = GetSpeedrunDetails(LoadedYear, LoadedWeek);
                 IsLoading = false;
             }
         }
 
 
-        internal static (string, string) GetSpeedrunDetails(int year, int week)
+        internal static (string seed, string setting, string dish) GetSpeedrunDetails(int year, int week)
         {
             int source = year * 200 + week;
             LayoutSeed layoutSeed = new LayoutSeed(source);
-            string seed = layoutSeed.FixedSeed.Value.ToString().ToUpper();
-            using FixedSeedContext fixedSeedContext = new FixedSeedContext(layoutSeed.FixedSeed, 8853129); int dishID;
+            string seed = layoutSeed.FixedSeed.Value.Value.ToUpper();
+            using FixedSeedContext fixedSeedContext = new FixedSeedContext(layoutSeed.FixedSeed, 8853129);
+            string setting;
             string dish;
+            using (fixedSeedContext.UseSubcontext(0))
+            {
+                int settingID = Kitchen.RandomExtensions.Random(AssetReference.FixedRunSetting);
+                setting = (GDOUtils.GetExistingGDO(settingID) as RestaurantSetting).Info.Get().Name;
+            }
             using (fixedSeedContext.UseSubcontext(1))
             {
-                dishID = Kitchen.RandomExtensions.Random(AssetReference.SpeedrunDish);
-                dish = (GDOUtils.GetExistingGDO(dishID) as Dish).Info.Get().Name;
+                Dish dishGDO;
+                if (year <= 2023 && week < 27)
+                {
+                    int dishID = Kitchen.RandomExtensions.Random(new int[]
+                    {
+                        DishReferences.Steak,
+                        DishReferences.FishBase,
+                        DishReferences.StirFryBase,
+                        DishReferences.PieBase
+                    });
+                    dishGDO = GDOUtils.GetExistingGDO(dishID) as Dish;
+                }
+                else
+                {
+                    dishGDO = Kitchen.RandomExtensions.Random((from x in GameData.Main.Get<Dish>()
+                                                                    where x.IsSpeedrunDish
+                                                                    select x).ToList());
+                }
+                dish = dishGDO.Info.Get().Name;
             }
-            return (seed, dish);
+            return (seed, setting, dish);
         }
 
         internal static void RequestLeaderboard(DateTime dateTime)
@@ -155,8 +178,8 @@ namespace KitchenMoreSpeedrunInfo
             {
                 for (int j = 1; j < GetWeeksInYear(i) + 1; j++)
                 {
-                    (string, string) speedrunDetails = GetSpeedrunDetails(i, j);
-                    LogInfo($"{i},{j},{speedrunDetails.Item2},{speedrunDetails.Item1}");
+                    (string seed, string setting, string dish) speedrunDetails = GetSpeedrunDetails(i, j);
+                    LogInfo($"{i},{j},{speedrunDetails.seed},{speedrunDetails.setting},{speedrunDetails.dish}");
                 }
             }
         }
