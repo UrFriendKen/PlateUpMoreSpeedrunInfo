@@ -6,6 +6,7 @@ using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
+using System.Globalization;
 
 namespace KitchenMoreSpeedrunInfo
 {
@@ -368,7 +369,7 @@ namespace KitchenMoreSpeedrunInfo
 
         public static bool IsValidDate(int day, int month, int year, out DateTime date)
         {
-            return DateTime.TryParse($"{month}/{day}/{year}", out date);
+            return DateTime.TryParse($"{month}/{day}/{year}", CultureInfo.InvariantCulture, DateTimeStyles.AssumeLocal, out date);
         }
 
         public static DateTime ClampDateTime(DateTime value, DateTime minValue, DateTime maxValue)
