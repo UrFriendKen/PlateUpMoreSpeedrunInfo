@@ -7,6 +7,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 using UnityEngine;
 using System.Globalization;
+using Kitchen;
+using Controllers;
+using KitchenData;
 
 namespace KitchenMoreSpeedrunInfo
 {
@@ -23,6 +26,9 @@ namespace KitchenMoreSpeedrunInfo
 
         protected Texture2D Background { get; private set; }
 
+        // Temp while OnInit is not being called
+        bool _isInit = false;
+
         public SpeedrunMenu()
         {
             ButtonName = "Speedrun";
@@ -30,6 +36,7 @@ namespace KitchenMoreSpeedrunInfo
 
         public sealed override void OnInit()
         {
+            _isInit = true;
             Background = new Texture2D(64, 64);
             UnityEngine.Color grayWithAlpha = new UnityEngine.Color(0.2f, 0.2f, 0.2f, 0.6f);
             for (int x = 0; x < 64; x++)
@@ -45,6 +52,12 @@ namespace KitchenMoreSpeedrunInfo
 
         public sealed override void Setup()
         {
+            // Temp while OnInit is not being called
+            if (!_isInit)
+            {
+                OnInit();
+            }
+
             if (LabelLeftStyle == null)
             {
                 LabelLeftStyle = new GUIStyle(GUI.skin.label);
@@ -137,7 +150,7 @@ namespace KitchenMoreSpeedrunInfo
 
         protected Color highlightedPlayerColor => Color.red;
         private string highlightedPlayerNameTemp = String.Empty;
-        private string highlightedPlayerName = SteamPlatform.Steam.LocalUsername;
+        private string highlightedPlayerName = Platforms.Platform.Current.GetDisplayName(Session.GameCreator.InputSource.GetPlatformUser(InputSourceIdentifier.Identifier.Value));
         private bool foundHighlightedPlayer = true;
         private Color searchPlayerNoResultColor => Color.red;
 
@@ -167,7 +180,7 @@ namespace KitchenMoreSpeedrunInfo
             GUILayout.Label("Search by date", LabelCentreStyle);
             GUILayout.BeginHorizontal();
             GUILayout.Label("Year");
-            searchYear = SanitiseIntInput(GUILayout.TextField(searchYear, GUILayout.Width(dateSearchBoxWidth)), searchYear, min: 2023, max: yearNow);
+            searchYear = SanitiseIntInput(GUILayout.TextField(searchYear, GUILayout.Width(dateSearchBoxWidth)), searchYear, min: 0, max: yearNow);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             GUILayout.Label("Month");
@@ -182,8 +195,7 @@ namespace KitchenMoreSpeedrunInfo
             {
                 if (GUILayout.Button("Date Search"))
                 {
-                    searchDate = ClampDateTime(searchDate, SPEEDRUN_INTRODUCTION_DATE, DateTime.Now);
-                    Main.RequestLeaderboard(searchDate);
+                    Main.RequestLeaderboard(ClampDateTime(searchDate, SPEEDRUN_INTRODUCTION_DATE, DateTime.Now));
                     scrollPosition = default;
                     requestedLeaderboard = true;
                 }
