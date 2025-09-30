@@ -274,7 +274,11 @@ namespace KitchenMoreSpeedrunInfo
                 currentPage++;
                 scrollPosition = default;
             }
-            currentPage = Mathf.Clamp(currentPage, 0, Mathf.CeilToInt(Main.SpeedrunData.Count / (float)MAX_ROWS_PER_PAGE) - 1);
+            Main.LogInfo($"Count = {Main.SpeedrunData.Count}");
+            int maxPage = Mathf.CeilToInt(Main.SpeedrunData.Count / (float)MAX_ROWS_PER_PAGE) - 1;
+            if (maxPage < 0)
+                maxPage = 0;
+            currentPage = Mathf.Clamp(currentPage, 0, maxPage);
 
             if (requestedLeaderboard && !Main.IsLoading)
             {

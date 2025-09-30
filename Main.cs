@@ -4,6 +4,7 @@ using KitchenLib;
 using KitchenLib.References;
 using KitchenLib.Utils;
 using KitchenMods;
+using Platforms;
 using Steamworks;
 using Steamworks.Data;
 using System;
@@ -11,6 +12,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using UnityEngine;
 
 // Namespace should have "Kitchen" in the beginning
@@ -32,7 +34,7 @@ namespace KitchenMoreSpeedrunInfo
         // Mod Version must follow semver notation e.g. "1.2.3"
         public const string MOD_GUID = "IcedMilo.PlateUp.MoreSpeedrunInfo";
         public const string MOD_NAME = "MoreSpeedrunInfo";
-        public const string MOD_VERSION = "0.2.6";
+        public const string MOD_VERSION = "0.2.7";
         public const string MOD_AUTHOR = "IcedMilo";
         public const string MOD_GAMEVERSION = ">=1.1.5";
         // Game version this mod is designed for in semver
@@ -60,6 +62,8 @@ namespace KitchenMoreSpeedrunInfo
         internal static int LoadedWeek;
         internal static int LoadedYear;
 
+        static MethodInfo m_GetLeaderboard;
+
         public Main() : base(MOD_GUID, MOD_NAME, MOD_AUTHOR, MOD_VERSION, MOD_GAMEVERSION, Assembly.GetExecutingAssembly()) { }
 
         protected override void OnInitialise()
@@ -77,7 +81,18 @@ namespace KitchenMoreSpeedrunInfo
             {
                 refreshLeaderboard = false;
 
-                Leaderboard? lb = await SpeedrunHelpers.GetLeaderboard(RequestYear, RequestWeek);
+                if (m_GetLeaderboard == null)
+                {
+                    m_GetLeaderboard = typeof(Platforms.Steam.SteamPlatform).GetMethod("GetLeaderboard", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (m_GetLeaderboard == null)
+                        return;
+                }
+                Main.LogInfo("m_GetLeaderboard true");
+                LeaderboardKey lbKey = new LeaderboardKey(RequestYear, RequestWeek);
+
+                Task<Leaderboard?> lbTask = (Task<Leaderboard?>)m_GetLeaderboard.Invoke(Platform.Current, new object[] { lbKey });
+                Leaderboard? lb = await lbTask;
+                
                 if (lb.HasValue)
                 {
                     List<SpeedrunEntry> newData = new List<SpeedrunEntry>();
